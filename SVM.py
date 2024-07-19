@@ -49,6 +49,3 @@ if test:
     st.write(y)
 else:
     st.write("")
-
-
-
