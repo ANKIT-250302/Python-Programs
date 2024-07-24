@@ -56,8 +56,8 @@ def word_vectorizer(doc, model, num_features):
         feature_vector = np.divide(feature_vector, num_words)
     return feature_vector
 
-svm=joblib.load("svm-model.pkl")
-model=joblib.load("w2v.pkl")
+svm=joblib.load("svm-model.h5")
+model=joblib.load("w2v.h5")
 test = st.text_input("Enter the string")
 if test:
     t_v=preprocess_text(test)
