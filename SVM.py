@@ -7,6 +7,25 @@ from nltk.corpus import stopwords
 from gensim.models import Word2Vec
 import streamlit as st
 
+# Custom CSS to change the background color of multiple input boxes
+st.markdown(
+    """
+    <style>
+    .stTextInput > div > div > input {
+        background-color: #f0f0f5;
+    }
+    .stNumberInput > div > div > input {
+        background-color: #e0f7fa;
+    }
+    .stTextArea > div > div > textarea {
+        background-color: #e8f5e9;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
 # Define the preprocessing function
 def preprocess_text(text):
     # Ensure text is a string
