@@ -1,9 +1,6 @@
 streamlit
-numpy
-pandas
-qdrant_client
+Pillow
+qdrant-client
 fastembed
 transformers
-time
-uuid
-pillow
+numpy
