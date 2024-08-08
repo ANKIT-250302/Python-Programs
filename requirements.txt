@@ -1,8 +1,6 @@
 streamlit
-joblib
 numpy
 pandas
-scikit-learn
 qdrant_client
 fastembed
 transformers
