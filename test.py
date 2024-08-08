@@ -72,6 +72,7 @@ def about_me():
         st.write('+91 9461962044')
         st.write('[LinkedIn Profile](https://www.linkedin.com/in/ankit-jangid)')
         st.write('ajladaniya425@gmail.com')
+        st.write('https://docs.google.com/document/d/1rzvM_XdlbO_hkSLwXwkVSb4imwsrKFNHrxA1LOKDNqA/edit?usp=sharing')
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
