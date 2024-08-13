@@ -7,6 +7,10 @@ from fastembed import TextEmbedding
 from transformers import BlipProcessor, BlipForConditionalGeneration
 import numpy as np
 import time
+from transformers import AutoProcessor, AutoTokenizer, AutoModelForZeroShotImageClassification
+model_name = "openai/clip-vit-base-patch32"
+i_processor = AutoProcessor.from_pretrained(model_name)
+i_model = AutoModelForZeroShotImageClassification.from_pretrained(model_name)
 
 # Initialize embedding model
 embedding_model = TextEmbedding()
@@ -23,27 +27,35 @@ qdrant_url = 'https://0d23ce49-803b-4c5e-b670-c5d80a86e6c1.us-east4-0.gcp.cloud.
 client = QdrantClient(url=qdrant_url, api_key=api_key)
 
 # Function to process image and text, and upsert to Qdrant
-def process_image_and_text(image, text):
-    img_px = list(image.getdata())
-    img_size = image.size
-    embed = embedding_model.embed([text])
-    for i in embed:
-        embed = i
-    point = PointStruct(id=str(uuid.uuid4()), vector=embed, payload={"pixel_lst": img_px, "img_size": img_size, "image_text": text})
-    
-    # Retry logic for upsert operation
-    retries = 3
+def process_image_and_text(image, text, retries=3):
     for attempt in range(retries):
         try:
-            client.upsert(collection_name="clip_embedding", points=[point], wait=True)
+            # For text to image
+            img_px = list(image.getdata())
+            img_size = image.size
+            embed = embedding_model.embed([text])
+            for i in embed:
+                embed = i
+            point = PointStruct(id=str(uuid.uuid4()), vector=embed, payload={"pixel_lst": img_px, "img_size": img_size, "image_text": text})
+            
+            # For image to image
+            processed_img = i_processor(text=None, images=image, return_tensors="pt")['pixel_values']
+            img_embds = i_model.get_image_features(processed_img).detach().numpy().tolist()[0]
+            
+            records = [PointStruct(id=str(uuid.uuid4()), vector=img_embds, payload={"pixel_lst": img_px, "img_size": img_size,"image_text": text})]
+
+            # Uploading both the data
+            client.upsert(collection_name="image_vectors", points=records, wait=True)
+            client.upsert(collection_name="text_vectors", points=[point], wait=True)
             st.success("Image and text have been processed and upserted to Qdrant!")
-            break
+            break  # Exit the loop if successful
         except Exception as e:
             if attempt < retries - 1:
                 st.warning(f"Retrying due to error: {e}. Attempt {attempt + 1}/{retries}")
-                time.sleep(2)  # Wait before retrying
+                time.sleep(2)  # Wait for 2 seconds before retrying
             else:
                 st.error(f"Failed after {retries} attempts: {e}")
+
 
 # Function to convert pixel list and image size to an Image object
 def create_image_from_pixels(pixel_lst, img_size):
@@ -75,7 +87,7 @@ def about_me():
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Home", "Upload & Process", "Search", "About"])
+page = st.sidebar.radio("Go to", ["Home", "Upload & Process", "Text Search","Image Searching", "About"])
 
 # Home page
 if page == "Home":
@@ -157,5 +169,34 @@ elif page == "Search":
         else:
             st.error("Please enter a query.")
 
+elif page == "Image Searching":
+    query_images = st.file_uploader("Upload images", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="search_process")
+    if st.button("Image Search", key="img_button"):
+        if query_images:
+            try:
+                for query_image in query_images:
+                    image = Image.open(query_image)
+                    processed_img = i_processor(images=image, return_tensors="pt")['pixel_values']
+                    img_embeddings = i_model.get_image_features(processed_img).detach().numpy().tolist()[0]
+                    hits = client.search(collection_name="image_vectors", query_vector=img_embeddings, limit=1)
+                    
+                    if hits:
+                        hit = hits[0]
+                        img_size = tuple(hit.payload['img_size'])
+                        pixel_lst = [tuple(p) for p in hit.payload['pixel_lst']]
+                        
+                        # Create an image from pixel data
+                        img = Image.new('RGB', img_size)
+                        img.putdata(pixel_lst)
+                        st.image(img, caption='Retrieved Image', use_column_width=True)
+                    else:
+                        st.error("No matching image found.")
+            except Exception as e:
+                st.error(f"An error occurred during the search: {e}")
+        else:
+            st.error("Please upload an image to search.")
+
+
 elif page == "About":
     about_me()
+ 
